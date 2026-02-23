@@ -1,0 +1,737 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>📊 Alpaca Tax Analyzer</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
+<style>
+:root{--blue:#1565C0;--lblue:#1E88E5;--green:#2E7D32;--red:#C62828;--orange:#E65100;
+  --bg:#0f1117;--card:#1e2130;--card2:#252840;--border:#2d3154;--text:#e8eaf6;
+  --muted:#9fa8da;--accent:#5C6BC0;}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+/* Header */
+.header{background:linear-gradient(135deg,#0d1b4b,#1a237e,#283593);padding:24px 32px;
+  display:flex;align-items:center;justify-content:space-between;box-shadow:0 4px 20px #0009}
+.header h1{font-size:1.8rem;font-weight:700;letter-spacing:.5px}
+.header p{color:#90CAF9;font-size:.9rem;margin-top:4px}
+.badge{background:#1565C0;color:#fff;padding:4px 12px;border-radius:20px;font-size:.75rem;font-weight:600}
+/* Layout */
+.app{display:grid;grid-template-columns:280px 1fr;min-height:calc(100vh - 88px)}
+/* Sidebar */
+.sidebar{background:var(--card);padding:20px;border-right:1px solid var(--border);overflow-y:auto}
+.sidebar h3{color:#90CAF9;font-size:.8rem;text-transform:uppercase;letter-spacing:1.5px;
+  margin:16px 0 8px;padding-bottom:4px;border-bottom:1px solid var(--border)}
+.rate-row{display:flex;align-items:center;justify-content:space-between;margin:6px 0}
+.rate-row label{color:var(--muted);font-size:.85rem}
+.rate-row input{width:80px;background:var(--card2);border:1px solid var(--border);
+  color:var(--text);padding:4px 8px;border-radius:6px;text-align:right;font-size:.85rem}
+.rate-row input:focus{outline:none;border-color:var(--accent)}
+.radio-group label{display:flex;align-items:center;gap:8px;padding:8px;
+  border-radius:8px;cursor:pointer;font-size:.9rem;color:var(--muted)}
+.radio-group label:hover{background:var(--card2)}
+.radio-group input[type=radio]:checked + span{color:var(--text);font-weight:600}
+.tmi-row{padding:8px 0}
+.tmi-row label{color:var(--muted);font-size:.85rem;display:block;margin-bottom:4px}
+.tmi-row select{background:var(--card2);border:1px solid var(--border);color:var(--text);
+  padding:6px;border-radius:6px;width:100%}
+/* Main */
+.main{padding:24px;overflow-y:auto}
+/* Upload zone */
+.upload-zone{border:2px dashed var(--border);border-radius:16px;padding:40px;
+  text-align:center;cursor:pointer;transition:.3s;background:var(--card);position:relative}
+.upload-zone:hover,.upload-zone.drag{border-color:var(--accent);background:rgba(92,107,192,.08)}
+.upload-zone input{position:absolute;inset:0;opacity:0;cursor:pointer}
+.upload-icon{font-size:3rem;margin-bottom:12px}
+.upload-zone h3{font-size:1.1rem;color:#90CAF9}
+.upload-zone p{color:var(--muted);font-size:.85rem;margin-top:6px}
+.btn{display:inline-flex;align-items:center;gap:8px;padding:10px 20px;
+  border-radius:8px;border:none;cursor:pointer;font-size:.9rem;font-weight:600;
+  transition:.2s;text-decoration:none}
+.btn-primary{background:var(--blue);color:#fff}
+.btn-primary:hover{background:var(--lblue)}
+.btn-success{background:var(--green);color:#fff}
+.btn-outline{background:transparent;color:var(--muted);border:1px solid var(--border)}
+.btn-outline:hover{border-color:var(--accent);color:var(--text)}
+/* Status bar */
+.status-bar{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin:16px 0}
+.status-tag{background:var(--card2);border:1px solid var(--border);padding:4px 12px;
+  border-radius:20px;font-size:.8rem;color:var(--muted)}
+.status-tag.ok{border-color:var(--green);color:#81C784}
+.status-tag.err{border-color:var(--red);color:#EF9A9A}
+/* Year selector */
+.year-tabs{display:flex;gap:8px;flex-wrap:wrap;margin:16px 0}
+.year-tab{padding:8px 20px;border-radius:8px;border:1px solid var(--border);
+  background:var(--card2);color:var(--muted);cursor:pointer;font-size:.9rem}
+.year-tab.active,.year-tab:hover{background:var(--blue);border-color:var(--blue);color:#fff}
+/* Tabs */
+.tabs{display:flex;gap:4px;border-bottom:1px solid var(--border);margin:20px 0 0}
+.tab{padding:12px 20px;border-bottom:2px solid transparent;cursor:pointer;
+  font-size:.9rem;color:var(--muted);transition:.2s}
+.tab:hover{color:var(--text)}
+.tab.active{border-bottom-color:var(--accent);color:var(--text);font-weight:600}
+.tab-content{display:none;padding:20px 0}
+.tab-content.active{display:block}
+/* KPI cards */
+.kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin:16px 0}
+.kpi{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px;
+  border-left:4px solid var(--accent)}
+.kpi .label{color:var(--muted);font-size:.78rem;text-transform:uppercase;letter-spacing:.8px}
+.kpi .value{font-size:1.5rem;font-weight:700;margin-top:6px}
+.kpi .sub{color:var(--muted);font-size:.8rem;margin-top:2px}
+.kpi.green{border-left-color:var(--green)} .kpi.red{border-left-color:var(--red)}
+.kpi.orange{border-left-color:var(--orange)}
+/* Charts */
+.chart-row{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin:16px 0}
+.chart-card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:20px}
+.chart-card.full{grid-column:1/-1}
+.chart-card h4{color:#90CAF9;font-size:.85rem;text-transform:uppercase;
+  letter-spacing:.8px;margin-bottom:16px}
+canvas{max-height:280px}
+/* Table */
+.data-table{width:100%;border-collapse:collapse;font-size:.85rem;margin-top:12px}
+.data-table th{background:var(--card2);color:var(--muted);text-align:right;
+  padding:10px 12px;font-size:.75rem;text-transform:uppercase;letter-spacing:.8px}
+.data-table th:first-child{text-align:left}
+.data-table td{padding:10px 12px;border-bottom:1px solid var(--border);text-align:right}
+.data-table td:first-child{text-align:left;font-weight:500}
+.data-table tr:hover td{background:rgba(92,107,192,.07)}
+.pos{color:#81C784;font-weight:600} .neg{color:#EF9A9A;font-weight:600}
+/* IFU */
+.ifu-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px;margin:16px 0}
+.ifu-card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:20px}
+.ifu-card h4{color:#90CAF9;font-size:.85rem;text-transform:uppercase;
+  letter-spacing:.8px;margin-bottom:14px;display:flex;align-items:center;gap:8px}
+.ifu-row{display:flex;justify-content:space-between;padding:8px 0;
+  border-bottom:1px solid var(--border);font-size:.9rem}
+.ifu-row:last-child{border:none;font-weight:700;font-size:1rem}
+.ifu-row span:last-child{font-weight:600}
+.alert{border-radius:10px;padding:14px 16px;margin:12px 0;font-size:.88rem;
+  display:flex;gap:12px;align-items:flex-start}
+.alert-warn{background:#1a120060;border:1px solid #F9A825;color:#FFE082}
+.alert-info{background:#0a1a3060;border:1px solid #1565C0;color:#90CAF9}
+.formulaire{background:var(--card2);border:1px solid var(--border);
+  border-radius:10px;padding:16px;margin:10px 0}
+.formulaire h5{color:#90CAF9;margin-bottom:10px;font-size:.9rem}
+.form-row{display:flex;justify-content:space-between;font-size:.88rem;
+  padding:6px 0;border-bottom:1px solid var(--border)}
+.form-row:last-child{border:none}
+.form-case{background:var(--card);border:1px solid var(--accent);
+  border-radius:4px;padding:2px 8px;font-family:monospace;font-size:.85rem;color:#CE93D8}
+/* Export */
+.export-bar{display:flex;gap:12px;margin:20px 0;flex-wrap:wrap}
+/* Progress */
+#progress{display:none;text-align:center;padding:30px;color:var(--muted)}
+.spinner{border:3px solid var(--border);border-top-color:var(--accent);
+  border-radius:50%;width:40px;height:40px;animation:spin .8s linear infinite;margin:0 auto 12px}
+@keyframes spin{to{transform:rotate(360deg)}}
+/* Multi-années */
+.multi-table{width:100%;border-collapse:collapse;font-size:.9rem}
+.multi-table th{background:var(--card2);color:var(--muted);padding:12px;
+  text-align:center;font-size:.75rem;text-transform:uppercase}
+.multi-table td{padding:12px;text-align:center;border-bottom:1px solid var(--border)}
+.multi-table tr:hover td{background:rgba(92,107,192,.07)}
+/* Responsive */
+@media(max-width:900px){
+  .app{grid-template-columns:1fr}
+  .sidebar{display:none}
+  .chart-row{grid-template-columns:1fr}
+}
+/* Welcome */
+#welcome{text-align:center;padding:60px 20px}
+#welcome .icon{font-size:5rem;margin-bottom:20px}
+#welcome h2{font-size:1.6rem;margin-bottom:10px}
+#welcome p{color:var(--muted);max-width:500px;margin:0 auto 30px}
+.feat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));
+  gap:16px;max-width:800px;margin:30px auto 0;text-align:left}
+.feat{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:20px}
+.feat .icon{font-size:1.8rem;margin-bottom:8px}
+.feat h4{font-size:.95rem;margin-bottom:6px}
+.feat p{font-size:.82rem;color:var(--muted)}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div>
+    <h1>📊 Alpaca Tax Analyzer</h1>
+    <p>Analyseur fiscal & performance — Résidents fiscaux français</p>
+  </div>
+  <div style="display:flex;gap:10px;align-items:center">
+    <span class="badge" id="badge-count">0 relevé(s)</span>
+    <button class="btn btn-outline" onclick="resetApp()">🔄 Réinitialiser</button>
+  </div>
+</div>
+
+<div class="app">
+  <!-- SIDEBAR -->
+  <div class="sidebar">
+    <h3>💱 Taux EUR/USD</h3>
+    <div id="rates-container"></div>
+
+    <h3>🏛️ Régime fiscal</h3>
+    <div class="radio-group">
+      <label><input type="radio" name="regime" value="pfu" checked onchange="onRegimeChange()">
+        <span>PFU — Flat Tax (30%)</span></label>
+      <label><input type="radio" name="regime" value="barem" onchange="onRegimeChange()">
+        <span>Barème progressif</span></label>
+    </div>
+    <div class="tmi-row" id="tmi-row" style="display:none">
+      <label>TMI (%)</label>
+      <select id="tmi-select" onchange="refreshAll()">
+        <option value="11">11%</option><option value="30" selected>30%</option>
+        <option value="41">41%</option><option value="45">45%</option>
+      </select>
+    </div>
+
+    <h3>ℹ️ À propos</h3>
+    <p style="font-size:.78rem;color:var(--muted);line-height:1.6">
+      Compatible avec les relevés mensuels Alpaca Securities.<br><br>
+      ⚠️ Outil indicatif. Consultez un expert-comptable pour votre déclaration officielle.
+    </p>
+  </div>
+
+  <!-- MAIN -->
+  <div class="main">
+    <!-- Upload -->
+    <div class="upload-zone" id="drop-zone" ondragover="onDrag(event)" ondrop="onDrop(event)">
+      <input type="file" id="file-input" accept=".pdf" multiple onchange="handleFiles(this.files)">
+      <div class="upload-icon">📁</div>
+      <h3>Glissez vos relevés PDF ici</h3>
+      <p>ou cliquez pour sélectionner — plusieurs fichiers acceptés, toutes années</p>
+    </div>
+    <div id="status-bar" class="status-bar" style="display:none"></div>
+
+    <!-- Progress -->
+    <div id="progress">
+      <div class="spinner"></div>
+      <p id="progress-text">Analyse des PDF en cours…</p>
+    </div>
+
+    <!-- Year tabs -->
+    <div id="year-tabs" class="year-tabs" style="display:none"></div>
+
+    <!-- Welcome message -->
+    <div id="welcome">
+      <div class="icon">📊</div>
+      <h2>Bienvenue dans Alpaca Tax Analyzer</h2>
+      <p>Chargez vos relevés PDF Alpaca Securities pour analyser vos performances et préparer votre déclaration fiscale française.</p>
+      <div class="feat-grid">
+        <div class="feat"><div class="icon">📈</div><h4>Performance Mensuelle</h4>
+          <p>Gains/pertes réalisés, dividendes et évolution du portefeuille mois par mois.</p></div>
+        <div class="feat"><div class="icon">📅</div><h4>Bilan Annuel</h4>
+          <p>Synthèse complète USD et EUR avec graphiques interactifs.</p></div>
+        <div class="feat"><div class="icon">🧾</div><h4>IFU & Déclaration</h4>
+          <p>Cases 2042-C pré-remplies, formulaires 2047 et 3916, calcul PFU.</p></div>
+        <div class="feat"><div class="icon">🔄</div><h4>Multi-années</h4>
+          <p>Comparaison inter-annuelle et historique fiscal complet.</p></div>
+      </div>
+    </div>
+
+    <!-- Dashboard (hidden until data loaded) -->
+    <div id="dashboard" style="display:none">
+      <div class="tabs">
+        <div class="tab active" onclick="showTab('monthly')">📈 Mensuel</div>
+        <div class="tab" onclick="showTab('annual')">📅 Bilan Annuel</div>
+        <div class="tab" onclick="showTab('ifu')">🧾 IFU & Déclaration</div>
+        <div class="tab" onclick="showTab('multi')">🔄 Multi-années</div>
+      </div>
+
+      <!-- TAB: MENSUEL -->
+      <div class="tab-content active" id="tab-monthly">
+        <div class="kpi-grid" id="kpi-monthly"></div>
+        <div class="chart-row">
+          <div class="chart-card full"><h4>📊 Plus/Moins-values réalisées par mois</h4>
+            <canvas id="chart-pv"></canvas></div>
+        </div>
+        <div class="chart-row">
+          <div class="chart-card"><h4>💰 Dividendes mensuels</h4>
+            <canvas id="chart-div"></canvas></div>
+          <div class="chart-card"><h4>📈 Évolution du portefeuille</h4>
+            <canvas id="chart-port"></canvas></div>
+        </div>
+        <h4 style="margin:20px 0 10px;color:#90CAF9;font-size:.85rem;text-transform:uppercase;letter-spacing:.8px">📋 Détail mensuel</h4>
+        <div style="overflow-x:auto"><table class="data-table" id="table-monthly"></table></div>
+      </div>
+
+      <!-- TAB: ANNUEL -->
+      <div class="tab-content" id="tab-annual">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:20px">
+          <div><h4 style="color:#90CAF9;margin-bottom:12px">🇺🇸 En USD</h4>
+            <div id="annual-usd"></div></div>
+          <div><h4 style="color:#90CAF9;margin-bottom:12px">🇫🇷 En EUR</h4>
+            <div id="annual-eur"></div></div>
+        </div>
+        <div class="chart-card full"><h4>📊 Synthèse annuelle — Waterfall</h4>
+          <canvas id="chart-waterfall"></canvas></div>
+      </div>
+
+      <!-- TAB: IFU -->
+      <div class="tab-content" id="tab-ifu">
+        <div class="alert alert-warn">⚠️ <div>Ces données sont <strong>indicatives</strong>. Utilisez les taux de change officiels BCE. Consultez un expert-comptable avant soumission.</div></div>
+        <div class="ifu-grid" id="ifu-cards"></div>
+        <h4 style="margin:20px 0 10px;color:#90CAF9;font-size:.85rem;text-transform:uppercase;letter-spacing:.8px">📝 Formulaires fiscaux</h4>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px" id="formulaires"></div>
+        <div class="export-bar" id="export-bar"></div>
+      </div>
+
+      <!-- TAB: MULTI -->
+      <div class="tab-content" id="tab-multi">
+        <div class="chart-card full" style="margin-bottom:16px">
+          <h4>📊 Comparaison annuelle</h4>
+          <canvas id="chart-multi"></canvas>
+        </div>
+        <div style="overflow-x:auto"><table class="multi-table" id="table-multi"></table></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ─── STATE ────────────────────────────────────────────────────────────────────
+const state = { allData: {}, currentYear: null, charts: {} };
+
+const MONTHS_FR = {1:'Jan',2:'Fév',3:'Mar',4:'Avr',5:'Mai',6:'Juin',
+                   7:'Juil',8:'Août',9:'Sep',10:'Oct',11:'Nov',12:'Déc'};
+const MONTHS_FULL = {1:'Janvier',2:'Février',3:'Mars',4:'Avril',5:'Mai',6:'Juin',
+                     7:'Juillet',8:'Août',9:'Septembre',10:'Octobre',11:'Novembre',12:'Décembre'};
+
+const DEFAULT_RATES = {2020:1.141,2021:1.183,2022:1.053,2023:1.081,2024:1.085,2025:1.075,2026:1.04};
+
+// ─── INIT ─────────────────────────────────────────────────────────────────────
+function init() {
+  const rc = document.getElementById('rates-container');
+  for (let y=2020; y<=2026; y++) {
+    rc.innerHTML += `<div class="rate-row">
+      <label>${y}</label>
+      <input type="number" id="rate-${y}" value="${DEFAULT_RATES[y]||1.08}" 
+             step="0.001" min="0.5" max="3" onchange="refreshAll()">
+    </div>`;
+  }
+}
+
+function getRate(year) {
+  const el = document.getElementById(`rate-${year}`);
+  return el ? parseFloat(el.value)||1.08 : 1.08;
+}
+function getRegime() { return document.querySelector('[name=regime]:checked')?.value||'pfu'; }
+function getTMI() { return parseInt(document.getElementById('tmi-select')?.value||30)/100; }
+
+function onRegimeChange() {
+  const barem = getRegime()==='barem';
+  document.getElementById('tmi-row').style.display = barem ? 'block' : 'none';
+  refreshAll();
+}
+
+// ─── DRAG & DROP ─────────────────────────────────────────────────────────────
+function onDrag(e) { e.preventDefault(); document.getElementById('drop-zone').classList.add('drag'); }
+function onDrop(e) {
+  e.preventDefault(); document.getElementById('drop-zone').classList.remove('drag');
+  handleFiles(e.dataTransfer.files);
+}
+
+// ─── UPLOAD ───────────────────────────────────────────────────────────────────
+async function handleFiles(files) {
+  if (!files.length) return;
+  document.getElementById('welcome').style.display = 'none';
+  document.getElementById('progress').style.display = 'block';
+  document.getElementById('dashboard').style.display = 'none';
+  document.getElementById('year-tabs').style.display = 'none';
+
+  const fd = new FormData();
+  for (const f of files) fd.append('files', f);
+
+  try {
+    const res = await fetch('/api/upload', {method:'POST', body:fd});
+    const json = await res.json();
+    processStatements(json.statements, json.errors);
+  } catch(e) {
+    document.getElementById('progress').style.display = 'none';
+    alert('Erreur de connexion au serveur : ' + e.message);
+  }
+}
+
+function processStatements(stmts, errors) {
+  stmts.forEach(d => {
+    if (!state.allData[d.year]) state.allData[d.year] = {};
+    state.allData[d.year][d.month.toLowerCase()] = d;
+  });
+
+  document.getElementById('progress').style.display = 'none';
+  document.getElementById('badge-count').textContent = `${stmts.length} relevé(s)`;
+
+  // Status bar
+  const sb = document.getElementById('status-bar');
+  sb.style.display = 'flex';
+  sb.innerHTML = `<span class="status-tag ok">✅ ${stmts.length} relevé(s) analysé(s)</span>`;
+  const years = Object.keys(state.allData).sort();
+  sb.innerHTML += `<span class="status-tag ok">📅 Années : ${years.join(', ')}</span>`;
+  if (errors.length) sb.innerHTML += `<span class="status-tag err">⚠️ ${errors.length} erreur(s)</span>`;
+
+  renderYearTabs();
+  const lastYear = parseInt(years[years.length-1]);
+  selectYear(lastYear);
+}
+
+function renderYearTabs() {
+  const yt = document.getElementById('year-tabs');
+  yt.style.display = 'flex';
+  yt.innerHTML = Object.keys(state.allData).sort().map(y =>
+    `<div class="year-tab${parseInt(y)===state.currentYear?' active':''}" onclick="selectYear(${y})">
+      📅 ${y} (${Object.keys(state.allData[y]).length} mois)
+    </div>`
+  ).join('');
+}
+
+function selectYear(y) {
+  state.currentYear = y;
+  renderYearTabs();
+  document.getElementById('dashboard').style.display = 'block';
+  refreshAll();
+}
+
+function refreshAll() {
+  if (!state.currentYear) return;
+  renderMonthly();
+  renderAnnual();
+  renderIFU();
+  renderMulti();
+}
+
+// ─── CALCUL ANNUEL ────────────────────────────────────────────────────────────
+function computeAnnual(yearData, eurRate) {
+  const months = Object.values(yearData).sort((a,b)=>a.month_num-b.month_num);
+  const dec = yearData['december'];
+  const pick = (ytd, per) => dec ? (dec[ytd]||0) : months.reduce((s,m)=>s+(m[per]||0),0);
+
+  const d = {
+    st_gain: pick('st_gain_ytd','st_gain_period'),
+    st_loss: pick('st_loss_ytd','st_loss_period'),
+    st_net:  pick('st_net_ytd', 'st_net_period'),
+    lt_gain: pick('lt_gain_ytd','lt_gain_period'),
+    lt_loss: pick('lt_loss_ytd','lt_loss_period'),
+    lt_net:  pick('lt_net_ytd', 'lt_net_period'),
+    dividends: pick('dividend_ytd','dividend_period'),
+    withholding: months.reduce((s,m)=>s+(m.withholding_tax_period||0),0),
+  };
+  d.total_net = d.st_net + d.lt_net;
+  Object.keys(d).forEach(k => d[k+'_eur'] = d[k]/eurRate);
+
+  const regime = getRegime();
+  const pv_pos = Math.max(0, d.total_net_eur);
+  if (regime==='pfu') {
+    d.tax_pv = pv_pos * 0.30;
+    d.tax_div = d.dividends_eur * 0.30;
+    d.regime_label = 'PFU 30%';
+  } else {
+    const tmi = getTMI(), ps = 0.172;
+    d.tax_pv  = pv_pos * (tmi + ps);
+    d.tax_div = d.dividends_eur * 0.60 * (tmi + ps);
+    d.regime_label = `Barème ${(tmi*100).toFixed(0)}%`;
+  }
+  d.tax_total = d.tax_pv + d.tax_div;
+  d.tax_credit = d.withholding_eur;
+  d.tax_net = Math.max(0, d.tax_total - d.tax_credit);
+  d.div_abat = d.dividends_eur * 0.60;
+  return d;
+}
+
+// ─── UTILS ────────────────────────────────────────────────────────────────────
+const fUSD = v => `$${v.toLocaleString('fr-FR',{minimumFractionDigits:2,maximumFractionDigits:2})}`;
+const fEUR = v => `${v.toLocaleString('fr-FR',{minimumFractionDigits:2,maximumFractionDigits:2})} €`;
+const cls  = v => v>=0?'pos':'neg';
+const sign = v => v>=0?'+':'';
+
+function mkChart(id, cfg) {
+  if (state.charts[id]) state.charts[id].destroy();
+  const ctx = document.getElementById(id)?.getContext('2d');
+  if (!ctx) return;
+  Chart.defaults.color='#9fa8da'; Chart.defaults.borderColor='#2d3154';
+  state.charts[id] = new Chart(ctx, cfg);
+}
+
+// ─── MENSUEL ──────────────────────────────────────────────────────────────────
+function renderMonthly() {
+  const yd = state.allData[state.currentYear];
+  const months = Object.values(yd).sort((a,b)=>a.month_num-b.month_num);
+  const eur = getRate(state.currentYear);
+  const ann = computeAnnual(yd, eur);
+
+  const labels = months.map(m=>MONTHS_FR[m.month_num]||m.month);
+  const pvCT = months.map(m=>m.st_net_period);
+  const pvLT = months.map(m=>m.lt_net_period);
+  const pvTot = months.map(m=>m.total_net_period);
+  const divs  = months.map(m=>m.dividend_period);
+  const ports  = months.map(m=>m.total_market_value);
+  const lastPort = months[months.length-1]?.total_market_value||0;
+
+  // KPIs
+  document.getElementById('kpi-monthly').innerHTML = `
+    <div class="kpi green"><div class="label">PV Nettes (USD)</div>
+      <div class="value ${cls(ann.total_net)}">${sign(ann.total_net)}${fUSD(ann.total_net)}</div>
+      <div class="sub">Court terme + Long terme</div></div>
+    <div class="kpi ${ann.total_net_eur>=0?'green':'red'}"><div class="label">PV Nettes (EUR)</div>
+      <div class="value ${cls(ann.total_net_eur)}">${sign(ann.total_net_eur)}${fEUR(ann.total_net_eur)}</div>
+      <div class="sub">Taux ${eur.toFixed(3)}</div></div>
+    <div class="kpi orange"><div class="label">Dividendes (USD)</div>
+      <div class="value">${fUSD(ann.dividends)}</div>
+      <div class="sub">Bruts avant retenue</div></div>
+    <div class="kpi"><div class="label">Portfolio final</div>
+      <div class="value">${fUSD(lastPort)}</div>
+      <div class="sub">${months.length} mois chargés</div></div>
+    <div class="kpi red"><div class="label">Impôt estimé (${ann.regime_label})</div>
+      <div class="value">${fEUR(ann.tax_net)}</div>
+      <div class="sub">Après crédit impôt étranger</div></div>`;
+
+  // Chart PV
+  mkChart('chart-pv',{type:'bar',data:{labels,datasets:[
+    {label:'PV Court terme',data:pvCT,backgroundColor:pvCT.map(v=>v>=0?'#43A047aa':'#E53935aa'),borderWidth:1},
+    {label:'PV Long terme',data:pvLT,backgroundColor:pvLT.map(v=>v>=0?'#1E88E5aa':'#FB8C00aa'),borderWidth:1},
+    {label:'Total net',data:pvTot,type:'line',borderColor:'#CE93D8',borderWidth:2.5,
+     pointBackgroundColor:'#CE93D8',tension:.3,fill:false,yAxisID:'y'}
+  ]},options:{responsive:true,interaction:{mode:'index'},plugins:{legend:{position:'top'}},
+    scales:{y:{grid:{color:'#2d3154'}}}}});
+
+  // Chart Dividendes
+  mkChart('chart-div',{type:'bar',data:{labels,datasets:[
+    {label:'Dividendes ($)',data:divs,backgroundColor:'#FFA726bb',borderWidth:1}
+  ]},options:{responsive:true,plugins:{legend:{display:false}},
+    scales:{y:{grid:{color:'#2d3154'}}}}});
+
+  // Chart Portfolio
+  if (ports.some(v=>v>0))
+    mkChart('chart-port',{type:'line',data:{labels,datasets:[
+      {label:'Portfolio ($)',data:ports,borderColor:'#1565C0',borderWidth:2.5,
+       backgroundColor:'rgba(21,101,192,.1)',fill:true,tension:.3,pointRadius:4}
+    ]},options:{responsive:true,plugins:{legend:{display:false}},
+      scales:{y:{grid:{color:'#2d3154'}}}}});
+
+  // Table
+  const tbl = document.getElementById('table-monthly');
+  tbl.innerHTML = `<tr><th>Mois</th><th>PV CT ($)</th><th>PV LT ($)</th>
+    <th>PV Total ($)</th><th>PV Total (€)</th><th>Dividendes ($)</th><th>Portfolio ($)</th></tr>` +
+    months.map(m=>{
+      const tot=m.total_net_period, totE=tot/eur;
+      return `<tr>
+        <td>${MONTHS_FULL[m.month_num]||m.month}</td>
+        <td class="${cls(m.st_net_period)}">${sign(m.st_net_period)}${fUSD(m.st_net_period)}</td>
+        <td class="${cls(m.lt_net_period)}">${sign(m.lt_net_period)}${fUSD(m.lt_net_period)}</td>
+        <td class="${cls(tot)}">${sign(tot)}${fUSD(tot)}</td>
+        <td class="${cls(totE)}">${sign(totE)}${fEUR(totE)}</td>
+        <td>${fUSD(m.dividend_period)}</td>
+        <td>${m.total_market_value>0?fUSD(m.total_market_value):'—'}</td>
+      </tr>`;}).join('');
+}
+
+// ─── ANNUEL ───────────────────────────────────────────────────────────────────
+function renderAnnual() {
+  const yd = state.allData[state.currentYear];
+  const eur = getRate(state.currentYear);
+  const a = computeAnnual(yd, eur);
+  const src = yd['december'] ? '(YTD décembre)' : '(cumul mensuel)';
+
+  const mkTable = rows => `<table class="data-table">${rows.map(([l,v,e])=>
+    `<tr><td>${l}</td><td class="${cls(v)}">${sign(v)}${fUSD(v)}</td>
+         <td class="${cls(e)}">${sign(e)}${fEUR(e)}</td></tr>`).join('')}</table>`;
+
+  document.getElementById('annual-usd').innerHTML =
+    `<p style="color:var(--muted);font-size:.8rem;margin-bottom:8px">Source: ${src}</p>` +
+    mkTable([
+      ['Gains CT',  a.st_gain,  a.st_gain_eur],
+      ['Pertes CT', -a.st_loss, -a.st_loss_eur],
+      ['Net CT',    a.st_net,   a.st_net_eur],
+      ['Gains LT',  a.lt_gain,  a.lt_gain_eur],
+      ['Pertes LT', -a.lt_loss, -a.lt_loss_eur],
+      ['Net LT',    a.lt_net,   a.lt_net_eur],
+      ['⮞ TOTAL',  a.total_net, a.total_net_eur],
+      ['Dividendes', a.dividends, a.dividends_eur],
+      ['Retenue src.', -a.withholding, -a.withholding_eur],
+    ]);
+  document.getElementById('annual-eur').innerHTML = document.getElementById('annual-usd').innerHTML;
+
+  // Waterfall simulation via bar chart
+  const wfLabels = ['Gains CT','Pertes CT','Net CT','Gains LT','Pertes LT','Net LT','Dividendes'];
+  const wfVals = [a.st_gain_eur,-a.st_loss_eur,a.st_net_eur,a.lt_gain_eur,-a.lt_loss_eur,a.lt_net_eur,a.dividends_eur];
+  mkChart('chart-waterfall',{type:'bar',data:{labels:wfLabels,datasets:[{
+    label:'EUR (€)',data:wfVals,
+    backgroundColor:wfVals.map(v=>v>=0?'#43A047cc':'#E53935cc'),borderWidth:1
+  }]},options:{responsive:true,plugins:{legend:{display:false},
+    tooltip:{callbacks:{label:ctx=>`${fEUR(ctx.raw)}`}}},
+    scales:{y:{grid:{color:'#2d3154'},ticks:{callback:v=>`${v.toLocaleString('fr-FR')} €`}}}}});
+}
+
+// ─── IFU ─────────────────────────────────────────────────────────────────────
+function renderIFU() {
+  const yd = state.allData[state.currentYear];
+  const eur = getRate(state.currentYear);
+  const a = computeAnnual(yd, eur);
+  const y = state.currentYear;
+
+  document.getElementById('ifu-cards').innerHTML = `
+    <div class="ifu-card">
+      <h4>📈 Plus-values mobilières</h4>
+      <div class="ifu-row"><span>PV CT nettes</span><span class="${cls(a.st_net_eur)}">${sign(a.st_net_eur)}${fEUR(a.st_net_eur)}</span></div>
+      <div class="ifu-row"><span>PV LT nettes</span><span class="${cls(a.lt_net_eur)}">${sign(a.lt_net_eur)}${fEUR(a.lt_net_eur)}</span></div>
+      <div class="ifu-row"><span>Total PV nettes</span><span class="${cls(a.total_net_eur)}">${sign(a.total_net_eur)}${fEUR(a.total_net_eur)}</span></div>
+    </div>
+    <div class="ifu-card">
+      <h4>💰 Revenus mobiliers</h4>
+      <div class="ifu-row"><span>Dividendes bruts</span><span>${fEUR(a.dividends_eur)}</span></div>
+      <div class="ifu-row"><span>Retenue source (15% US)</span><span class="neg">-${fEUR(a.withholding_eur)}</span></div>
+      <div class="ifu-row"><span>Dividendes nets</span><span>${fEUR(a.dividends_eur-a.withholding_eur)}</span></div>
+    </div>
+    <div class="ifu-card">
+      <h4>🏛️ Impôt estimé (${a.regime_label})</h4>
+      <div class="ifu-row"><span>Impôt sur PV</span><span>${fEUR(a.tax_pv)}</span></div>
+      <div class="ifu-row"><span>Impôt sur dividendes</span><span>${fEUR(a.tax_div)}</span></div>
+      <div class="ifu-row"><span>Total avant crédit</span><span>${fEUR(a.tax_total)}</span></div>
+      <div class="ifu-row"><span>Crédit impôt étranger</span><span class="neg">-${fEUR(a.tax_credit)}</span></div>
+      <div class="ifu-row"><span>🔴 NET À PAYER</span><span class="neg">${fEUR(a.tax_net)}</span></div>
+    </div>`;
+
+  const pv3VG = Math.max(0, a.total_net_eur);
+  const pv3VH = Math.max(0, -a.total_net_eur);
+
+  document.getElementById('formulaires').innerHTML = `
+    <div class="formulaire">
+      <h5>📄 Formulaire 2042-C</h5>
+      <div class="form-row"><span>Case <span class="form-case">3VG</span> PV imposables</span><span>${fEUR(pv3VG)}</span></div>
+      <div class="form-row"><span>Case <span class="form-case">3VH</span> MV imputables</span><span>${fEUR(pv3VH)}</span></div>
+      <div class="form-row"><span>Case <span class="form-case">2DC</span> Dividendes PFU</span><span>${fEUR(a.dividends_eur)}</span></div>
+      <div class="form-row"><span>Case <span class="form-case">2AB</span> Crédit impôt</span><span>${fEUR(a.withholding_eur)}</span></div>
+      ${getRegime()==='barem'?`<div class="form-row"><span>Case <span class="form-case">2BH</span> Div. barème</span><span>${fEUR(a.dividends_eur)}</span></div>
+      <div class="form-row"><span>Case <span class="form-case">2DA</span> Div. (abat. 40%)</span><span>${fEUR(a.div_abat)}</span></div>`:''}
+    </div>
+    <div class="formulaire">
+      <h5>📄 Formulaire 2047 — Revenus étrangers</h5>
+      <div class="form-row"><span>Section IV – Dividendes étrangers</span><span>${fEUR(a.dividends_eur)}</span></div>
+      <div class="form-row"><span>Crédit impôt (retenue 15%)</span><span>${fEUR(a.withholding_eur)}</span></div>
+      <div class="form-row"><span>Section V – PV étrangères</span><span class="${cls(a.total_net_eur)}">${fEUR(a.total_net_eur)}</span></div>
+    </div>
+    <div class="formulaire">
+      <h5>📄 Formulaire 3916 — Compte étranger ⚠️</h5>
+      <div class="form-row"><span>Établissement</span><span>Alpaca Securities LLC</span></div>
+      <div class="form-row"><span>Pays</span><span>🇺🇸 États-Unis</span></div>
+      <div class="form-row"><span>Type</span><span>Compte-titres</span></div>
+      <div class="form-row"><span>Adresse</span><span>Nicosia, CYP 2113</span></div>
+      <div class="form-row"><span>Obligation</span><span style="color:#EF9A9A">Annuelle obligatoire</span></div>
+    </div>`;
+
+  const months = Object.values(yd).sort((a,b)=>a.month_num-b.month_num);
+  const csvRows = ['Mois;PV_CT_USD;PV_LT_USD;PV_Total_USD;PV_CT_EUR;PV_LT_EUR;PV_Total_EUR;Dividendes_USD;Dividendes_EUR;RetenueSrc_USD;Portfolio_USD',
+    ...months.map(m=>[
+      MONTHS_FULL[m.month_num]||m.month, m.st_net_period, m.lt_net_period, m.total_net_period,
+      (m.st_net_period/eur).toFixed(2), (m.lt_net_period/eur).toFixed(2), (m.total_net_period/eur).toFixed(2),
+      m.dividend_period, (m.dividend_period/eur).toFixed(2), m.withholding_tax_period, m.total_market_value
+    ].join(';'))].join('\n');
+
+  const ifuTxt = `RÉCAPITULATIF FISCAL ${y} — ALPACA SECURITIES
+${'='.repeat(55)}
+Taux EUR/USD : ${eur.toFixed(3)} | Régime : ${a.regime_label}
+Généré le : ${new Date().toLocaleString('fr-FR')}
+
+PLUS-VALUES MOBILIÈRES
+${'─'.repeat(40)}
+Gains CT réalisés  : ${fUSD(a.st_gain).padStart(15)} / ${fEUR(a.st_gain_eur).padStart(14)}
+Pertes CT réalisées: ${fUSD(a.st_loss).padStart(15)} / ${fEUR(a.st_loss_eur).padStart(14)}
+Net CT             : ${fUSD(a.st_net).padStart(15)} / ${fEUR(a.st_net_eur).padStart(14)}
+Gains LT réalisés  : ${fUSD(a.lt_gain).padStart(15)} / ${fEUR(a.lt_gain_eur).padStart(14)}
+Pertes LT réalisées: ${fUSD(a.lt_loss).padStart(15)} / ${fEUR(a.lt_loss_eur).padStart(14)}
+Net LT             : ${fUSD(a.lt_net).padStart(15)} / ${fEUR(a.lt_net_eur).padStart(14)}
+TOTAL PV NETTES    : ${fUSD(a.total_net).padStart(15)} / ${fEUR(a.total_net_eur).padStart(14)}
+
+REVENUS DE CAPITAUX MOBILIERS
+${'─'.repeat(40)}
+Dividendes bruts   : ${fUSD(a.dividends).padStart(15)} / ${fEUR(a.dividends_eur).padStart(14)}
+Retenue source 15% : ${fUSD(a.withholding).padStart(15)} / ${fEUR(a.withholding_eur).padStart(14)}
+
+FISCALITÉ ESTIMÉE (${a.regime_label})
+${'─'.repeat(40)}
+Impôt PV           :                    ${fEUR(a.tax_pv).padStart(14)}
+Impôt dividendes   :                    ${fEUR(a.tax_div).padStart(14)}
+Total              :                    ${fEUR(a.tax_total).padStart(14)}
+Crédit impôt       :                   -${fEUR(a.tax_credit).padStart(14)}
+NET À PAYER        :                    ${fEUR(a.tax_net).padStart(14)}
+
+CASES 2042-C
+3VG (PV imposables)  : ${fEUR(pv3VG)}
+3VH (MV imputables)  : ${fEUR(pv3VH)}
+2DC (Dividendes PFU) : ${fEUR(a.dividends_eur)}
+2AB (Crédit impôt)   : ${fEUR(a.withholding_eur)}
+
+⚠️ Document indicatif — Consultez un expert-comptable.`;
+
+  document.getElementById('export-bar').innerHTML = `
+    <button class="btn btn-success" onclick="downloadTxt('IFU_${y}_Alpaca.txt',${JSON.stringify(ifuTxt)})">📥 Télécharger IFU (.txt)</button>
+    <button class="btn btn-outline" onclick="downloadCsv('Alpaca_${y}_data.csv',${JSON.stringify(csvRows)})">📊 Télécharger données (.csv)</button>`;
+}
+
+// ─── MULTI-ANNÉES ─────────────────────────────────────────────────────────────
+function renderMulti() {
+  const years = Object.keys(state.allData).map(Number).sort();
+  if (years.length < 1) return;
+
+  const rows = years.map(y=>({
+    y, a: computeAnnual(state.allData[y], getRate(y))
+  }));
+
+  const labels = rows.map(r=>String(r.y));
+  mkChart('chart-multi',{type:'bar',data:{labels,datasets:[
+    {label:'PV nettes (€)',data:rows.map(r=>r.a.total_net_eur),backgroundColor:'#1E88E5bb'},
+    {label:'Dividendes (€)',data:rows.map(r=>r.a.dividends_eur),backgroundColor:'#FFA726bb'},
+    {label:'Impôt net (€)',data:rows.map(r=>r.a.tax_net),backgroundColor:'#E53935bb'},
+  ]},options:{responsive:true,interaction:{mode:'index'},plugins:{legend:{position:'top'}},
+    scales:{y:{grid:{color:'#2d3154'}}}}});
+
+  document.getElementById('table-multi').innerHTML =
+    `<tr><th>Année</th><th>PV nettes ($)</th><th>PV nettes (€)</th>
+     <th>Dividendes (€)</th><th>Retenue src (€)</th><th>Impôt PFU (€)</th><th>Net à payer (€)</th></tr>` +
+    rows.map(({y,a})=>`<tr>
+      <td><strong>${y}</strong></td>
+      <td class="${cls(a.total_net)}">${sign(a.total_net)}${fUSD(a.total_net)}</td>
+      <td class="${cls(a.total_net_eur)}">${sign(a.total_net_eur)}${fEUR(a.total_net_eur)}</td>
+      <td>${fEUR(a.dividends_eur)}</td>
+      <td class="neg">-${fEUR(a.withholding_eur)}</td>
+      <td>${fEUR(a.tax_total)}</td>
+      <td class="neg"><strong>${fEUR(a.tax_net)}</strong></td>
+    </tr>`).join('');
+}
+
+// ─── TABS ─────────────────────────────────────────────────────────────────────
+function showTab(name) {
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('.tab-content').forEach(t=>t.classList.remove('active'));
+  event.target.classList.add('active');
+  document.getElementById('tab-'+name).classList.add('active');
+}
+
+// ─── EXPORT ───────────────────────────────────────────────────────────────────
+function downloadTxt(name, content) {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([content],{type:'text/plain'}));
+  a.download = name; a.click();
+}
+function downloadCsv(name, content) {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([content],{type:'text/csv'}));
+  a.download = name; a.click();
+}
+
+function resetApp() {
+  if (!confirm('Réinitialiser toutes les données ?')) return;
+  state.allData = {}; state.currentYear = null;
+  Object.values(state.charts).forEach(c=>c.destroy());
+  state.charts = {};
+  document.getElementById('welcome').style.display = 'block';
+  document.getElementById('dashboard').style.display = 'none';
+  document.getElementById('year-tabs').style.display = 'none';
+  document.getElementById('status-bar').style.display = 'none';
+  document.getElementById('badge-count').textContent = '0 relevé(s)';
+  document.getElementById('file-input').value = '';
+}
+
+// ─── START ────────────────────────────────────────────────────────────────────
+init();
+</script>
+</body>
+</html>
